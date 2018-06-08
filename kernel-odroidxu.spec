@@ -20,6 +20,13 @@ Summary: The Linux kernel
 %global zipmodules 1
 %endif
 
+# Special sauce for the ODROID kernel
+%global _without_pae 1
+%global commit fe533806adeaa87e57e55e9ebd168ef906531a17
+%global shortcommit %(c=%{commit}; echo ${c:0:7})
+%global variant odroidxu
+%global signmodules 0
+
 %if %{zipmodules}
 %global zipsed -e 's/\.ko$/\.ko.xz/'
 %endif
@@ -42,25 +49,25 @@ Summary: The Linux kernel
 # For non-released -rc kernels, this will be appended after the rcX and
 # gitX tags, so a 3 here would become part of release "0.rcX.gitX.3"
 #
-%global baserelease 301
+%global baserelease 6
 %global fedora_build %{baserelease}
 
 # base_sublevel is the kernel version we're starting with and patching
 # on top of -- for example, 3.1-rc7-git1 starts with a 3.0 base,
 # which yields a base_sublevel of 0.
-%define base_sublevel 16
+%define base_sublevel 4
 
 ## If this is a released kernel ##
 %if 0%{?released_kernel}
 
 # Do we have a -stable update to apply?
-%define stable_update 3
+%define stable_update 104
 # Set rpm version accordingly
 %if 0%{?stable_update}
 %define stablerev %{stable_update}
 %define stable_base %{stable_update}
 %endif
-%define rpmversion 4.%{base_sublevel}.%{stable_update}
+%define rpmversion 3.%{base_sublevel}.%{stable_update}
 
 ## The not-released-kernel case ##
 %else
@@ -71,7 +78,7 @@ Summary: The Linux kernel
 # The git snapshot level
 %define gitrev 0
 # Set rpm version accordingly
-%define rpmversion 4.%{upstream_sublevel}.0
+%define rpmversion 3.%{upstream_sublevel}.0
 %endif
 # Nb: The above rcrev and gitrev values automagically define Patch00 and Patch01 below.
 
@@ -158,7 +165,7 @@ Summary: The Linux kernel
 %endif
 
 # The kernel tarball/base version
-%define kversion 4.%{base_sublevel}
+%define kversion 3.%{base_sublevel}
 
 %define make_target bzImage
 %define image_install_path boot
@@ -427,7 +434,7 @@ BuildRequires: binutils-%{_build_arch}-linux-gnu, gcc-%{_build_arch}-linux-gnu
 %define cross_opts CROSS_COMPILE=%{_build_arch}-linux-gnu-
 %endif
 
-Source0: https://www.kernel.org/pub/linux/kernel/v4.x/linux-%{kversion}.tar.xz
+Source0: https://github.com/hardkernel/linux/archive/%{commit}/linux-%{shortcommit}.tar.gz
 
 Source11: x509.genkey
 Source12: remove-binary-diff.pl
@@ -445,6 +452,7 @@ Source97: filter-s390x.sh
 Source99: filter-modules.sh
 %define modsign_cmd %{SOURCE18}
 
+%if 0
 Source20: kernel-aarch64.config
 Source21: kernel-aarch64-debug.config
 Source22: kernel-armv7hl.config
@@ -463,6 +471,7 @@ Source36: kernel-s390x.config
 Source37: kernel-s390x-debug.config
 Source38: kernel-x86_64.config
 Source39: kernel-x86_64-debug.config
+%endif
 
 Source40: generate_all_configs.sh
 Source41: generate_debug_configs.sh
@@ -483,7 +492,7 @@ Source2001: cpupower.config
 # For a stable release kernel
 %if 0%{?stable_update}
 %if 0%{?stable_base}
-%define    stable_patch_00  patch-4.%{base_sublevel}.%{stable_base}.xz
+%define    stable_patch_00  patch-3.%{base_sublevel}.%{stable_base}.xz
 Source5000: %{stable_patch_00}
 %endif
 
@@ -492,14 +501,14 @@ Source5000: %{stable_patch_00}
 # near the top of this spec file.
 %else
 %if 0%{?rcrev}
-Source5000: patch-4.%{upstream_sublevel}-rc%{rcrev}.xz
+Source5000: patch-3.%{upstream_sublevel}-rc%{rcrev}.xz
 %if 0%{?gitrev}
-Source5001: patch-4.%{upstream_sublevel}-rc%{rcrev}-git%{gitrev}.xz
+Source5001: patch-3.%{upstream_sublevel}-rc%{rcrev}-git%{gitrev}.xz
 %endif
 %else
 # pre-{base_sublevel+1}-rc1 case
 %if 0%{?gitrev}
-Source5000: patch-4.%{base_sublevel}-git%{gitrev}.xz
+Source5000: patch-3.%{base_sublevel}-git%{gitrev}.xz
 %endif
 %endif
 %endif
@@ -507,14 +516,26 @@ Source5000: patch-4.%{base_sublevel}-git%{gitrev}.xz
 ## Patches needed for building this package
 
 ## compile fixes
+Patch001: kernel-add-support-for-gcc-5.patch
+Patch002: compiler-gcc-integrate-the-various-compiler-gcc-345.h-files.patch
+Patch003: give-up-on-gcc-ilog2-constant-optimizations.patch
+Patch004: fix-some-bad-shifts-in-sec_dvfs.c.patch
+Patch005: ARM-fix-put_user-for-gcc-8.patch
+Patch006: crypto-fcrypt-Fix-bitoperation-for-compilation-with-clang.patch
 
 # ongoing complaint, full discussion delayed until ksummit/plumbers
-Patch002: 0001-iio-Use-event-header-from-kernel-tree.patch
+#Patch002: 0001-iio-Use-event-header-from-kernel-tree.patch
 
 # gcc -Werror=aliasing workaround
-Patch003: 0001-Temporarily-work-around-gcc-aliasing-warning-error.patch
+#Patch003: 0001-Temporarily-work-around-gcc-aliasing-warning-error.patch
 
 %if !%{nopatches}
+
+
+%endif
+
+# Disable standard patches
+%if 0
 
 # Git trees.
 
@@ -943,7 +964,7 @@ ApplyPatch()
     exit 1
   fi
   if ! grep -E "^Patch[0-9]+: $patch\$" %{_specdir}/${RPM_PACKAGE_NAME%%%%%{?hyphvariant}}.spec ; then
-    if [ "${patch:0:8}" != "patch-4." ] ; then
+    if [ "${patch:0:8}" != "patch-3." ] ; then
       echo "ERROR: Patch  $patch  not listed as a source patch in specfile"
       exit 1
     fi
@@ -976,20 +997,20 @@ ApplyOptionalPatch()
 
 # Update to latest upstream.
 %if 0%{?released_kernel}
-%define vanillaversion 4.%{base_sublevel}
+%define vanillaversion 3.%{base_sublevel}
 # non-released_kernel case
 %else
 %if 0%{?rcrev}
-%define vanillaversion 4.%{upstream_sublevel}-rc%{rcrev}
+%define vanillaversion 3.%{upstream_sublevel}-rc%{rcrev}
 %if 0%{?gitrev}
-%define vanillaversion 4.%{upstream_sublevel}-rc%{rcrev}-git%{gitrev}
+%define vanillaversion 3.%{upstream_sublevel}-rc%{rcrev}-git%{gitrev}
 %endif
 %else
 # pre-{base_sublevel+1}-rc1 case
 %if 0%{?gitrev}
-%define vanillaversion 4.%{base_sublevel}-git%{gitrev}
+%define vanillaversion 3.%{base_sublevel}-git%{gitrev}
 %else
-%define vanillaversion 4.%{base_sublevel}
+%define vanillaversion 3.%{base_sublevel}
 %endif
 %endif
 %endif
@@ -1002,7 +1023,7 @@ ApplyOptionalPatch()
 
 # Build a list of the other top-level kernel tree directories.
 # This will be used to hardlink identical vanilla subdirs.
-sharedirs=$(find "$PWD" -maxdepth 1 -type d -name 'kernel-4.*' \
+sharedirs=$(find "$PWD" -maxdepth 1 -type d -name 'kernel-3.*' \
             | grep -x -v "$PWD"/kernel-%{kversion}%{?dist}) ||:
 
 # Delete all old stale trees.
@@ -1048,7 +1069,7 @@ if [ ! -d kernel-%{kversion}%{?dist}/vanilla-%{vanillaversion} ]; then
       cp -al $sharedir/vanilla-%{kversion} .
     else
 %setup -q -n kernel-%{kversion}%{?dist} -c
-      mv linux-%{kversion} vanilla-%{kversion}
+      mv linux-%{commit} vanilla-%{kversion}
     fi
 
   fi
@@ -1123,20 +1144,25 @@ fi
 %if 0%{?stable_base}
 # This is special because the kernel spec is hell and nothing is consistent
 xzcat %{SOURCE5000} | patch -p1 -F1 -s
-git commit -a -m "Stable update"
+git commit -a -m "Stable update" --allow-empty
 %endif
 
 # Note: Even in the "nopatches" path some patches (build tweaks and compile
 # fixes) will always get applied; see patch defition above for details
 
-git am %{patches}
+if [ ! -z "%{patches}" ]; then
+    git am --ignore-whitespace %{patches}
+fi
 
 # END OF PATCH APPLICATIONS
 
 # Any further pre-build tree manipulations happen here.
 
 chmod +x scripts/checkpatch.pl
-chmod +x tools/objtool/sync-check.sh
+
+if [ -f tools/objtool/sync-check.sh ]; then
+    chmod +x tools/objtool/sync-check.sh
+fi
 
 # This Prevents scripts/setlocalversion from mucking with our version numbers.
 touch .scmversion
@@ -1146,7 +1172,7 @@ mkdir configs
 cd configs
 
 # Drop some necessary files from the source dir into the buildroot
-cp $RPM_SOURCE_DIR/kernel-*.config .
+(echo "# arm"; cat ../arch/arm/configs/odroidxu_ubuntu_defconfig) > kernel-armv7hl.config
 cp %{SOURCE1000} .
 cp %{SOURCE15} .
 cp %{SOURCE40} .
@@ -1283,7 +1309,7 @@ BuildKernel() {
     Arch=`head -1 .config | cut -b 3-`
     echo USING ARCH=$Arch
 
-    make %{?make_opts} ARCH=$Arch olddefconfig >/dev/null
+    make %{?make_opts} ARCH=$Arch oldnoconfig >/dev/null
     %{make} %{?make_opts} ARCH=$Arch %{?_smp_mflags} $MakeTarget %{?sparse_mflags} %{?kernel_mflags}
     %{make} %{?make_opts} ARCH=$Arch %{?_smp_mflags} modules %{?sparse_mflags} || exit 1
 
@@ -1294,9 +1320,13 @@ BuildKernel() {
 %endif
 
 %ifarch %{arm} aarch64
-    %{make} %{?make_opts} ARCH=$Arch dtbs dtbs_install INSTALL_DTBS_PATH=$RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer
+    %{make} %{?make_opts} ARCH=$Arch dtbs
+    mkdir -p $RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer
+    if [ -f arch/$Arch/boot/dts/*.dtb ]; then
+      install -m 0644 arch/$Arch/boot/dts/*.dtb $RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer/
+      find arch/$Arch/boot/dts -name '*.dtb' -type f | xargs rm -f
+    fi
     cp -r $RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer $RPM_BUILD_ROOT/lib/modules/$KernelVer/dtb
-    find arch/$Arch/boot/dts -name '*.dtb' -type f | xargs rm -f
 %endif
 
     # Start installing the results
@@ -1449,7 +1479,7 @@ BuildKernel() {
 %endif
     # Make sure the Makefile and version.h have a matching timestamp so that
     # external modules can be built
-    touch -r $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/Makefile $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include/generated/uapi/linux/version.h
+    touch -r $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/Makefile $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include/linux/version.h
 
     # Copy .config to include/config/auto.conf so "make prepare" is unnecessary.
     cp $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/.config $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include/config/auto.conf
@@ -1701,9 +1731,9 @@ find $RPM_BUILD_ROOT/usr/tmp-headers/include \
         -name ..install.cmd -o -name ..check.cmd \) | xargs rm -f
 
 # Copy all the architectures we care about to their respective asm directories
-for arch in arm arm64 powerpc s390 x86 ; do
+for arch in arm powerpc s390 x86 ; do
 mkdir -p $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include
-mv $RPM_BUILD_ROOT/usr/tmp-headers/include/arch-${arch}/asm $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/
+mv $RPM_BUILD_ROOT/usr/tmp-headers/include/asm-${arch} $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/
 cp -a $RPM_BUILD_ROOT/usr/tmp-headers/include/asm-generic $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/.
 done
 
@@ -1712,7 +1742,7 @@ rm -rf $RPM_BUILD_ROOT/usr/tmp-headers/include/arch*
 rm -rf $RPM_BUILD_ROOT/usr/tmp-headers/include/asm-*
 
 # Copy the rest of the headers over
-for arch in arm arm64 powerpc s390 x86 ; do
+for arch in arm powerpc s390 x86 ; do
 cp -a $RPM_BUILD_ROOT/usr/tmp-headers/include/* $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/.
 done
 

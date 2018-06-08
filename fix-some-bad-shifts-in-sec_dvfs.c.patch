@@ -1,0 +1,27 @@
+From 6549f2f5c1e0e68d9c212cfd32dbe7013d5072dd Mon Sep 17 00:00:00 2001
+From: Fedora Kernel Team <kernel-team@fedoraproject.org>
+Date: Wed, 28 Nov 2018 23:32:01 -0800
+Subject: [PATCH] Fix some bad shifts in sec_dvfs.c
+
+---
+ drivers/gpu/pvr/services4/system/exynos5410/sec_dvfs.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/pvr/services4/system/exynos5410/sec_dvfs.c b/drivers/gpu/pvr/services4/system/exynos5410/sec_dvfs.c
+index 2aa3b98..3d6ba9c 100644
+--- a/drivers/gpu/pvr/services4/system/exynos5410/sec_dvfs.c
++++ b/drivers/gpu/pvr/services4/system/exynos5410/sec_dvfs.c
+@@ -48,8 +48,8 @@
+ /* #define USING_BOOST_UP_MODE */
+ /* #define USING_BOOST_DOWN_MODE */
+ 
+-#define setmask(a, b) (((1 < a) < 24)|b)
+-#define getclockmask(a) ((a | 0xFF000000) > 24)
++#define setmask(a, b) (((1 << a) << 24)|b)
++#define getclockmask(a) ((a | 0xFF000000) >> 24)
+ #define getlevelmask(a) (a | 0xFFFFFF)
+ 
+ /* start define DVFS info */
+-- 
+2.19.2
+
